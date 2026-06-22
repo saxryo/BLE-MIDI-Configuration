@@ -14,7 +14,6 @@
         .card { background-color: #1e1e1e; border-radius: 12px; padding: 15px; margin-bottom: 20px; border: 1px solid #333; }
         .card-title { font-size: 1.1rem; color: #00ffcc; margin-top: 0; margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 5px; }
         .sub-section { margin-bottom: 15px; padding-left: 5px; }
-        .sub-section { margin-bottom: 15px; padding-left: 5px; }
         .sub-title { font-size: 0.9rem; color: #ffaa00; font-weight: bold; margin-bottom: 8px; }
         .form-group { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 0.85rem; }
         select, input[type="number"] { background-color: #2a2a2a; color: white; border: 1px solid #444; border-radius: 6px; padding: 6px; width: 120px; box-sizing: border-box; }
@@ -103,9 +102,11 @@
     async function connectBLE() {
         try {
             document.getElementById("statusText").innerText = "接続要求中...";
+            
+            // ⚡【超重要修正】アドバタイズパケット制限をバイパスし、周囲の全デバイスをポップアップに強制表示
             bleDevice = await navigator.bluetooth.requestDevice({
-                filters: [{ name: "RH-BLE-MIDI-Controller" }],
-                optionalServices: [MIDI_SERVICE_UUID]
+                acceptAllDevices: true,
+                optionalServices: [MIDI_SERVICE_UUID] // サービス接続に必要な親UUIDをここで許可
             });
 
             const server = await bleDevice.gatt.connect();
@@ -148,11 +149,10 @@
         data[idx++] = parseInt(document.getElementById("pots").value);
 
         try {
-            // ⚡【改善点】iOS/Bluefyブラウザ環境下で最もパケットが安定する「応答なし書き込み」を明示的に呼び出し
+            // iOS/Bluefyブラウザ環境下で最もパケットが安定する「応答なし書き込み」を実行
             if (typeof configCharacteristic.writeValueWithoutResponse === 'function') {
                 await configCharacteristic.writeValueWithoutResponse(data);
             } else {
-                // フォールバック（通常のブラウザ用）
                 await configCharacteristic.writeValue(data);
             }
             alert("設定を送信しました！コントローラーのLED点滅を確認してください。");
