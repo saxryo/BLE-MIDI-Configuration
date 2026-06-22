@@ -14,6 +14,7 @@
         .card { background-color: #1e1e1e; border-radius: 12px; padding: 15px; margin-bottom: 20px; border: 1px solid #333; }
         .card-title { font-size: 1.1rem; color: #00ffcc; margin-top: 0; margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 5px; }
         .sub-section { margin-bottom: 15px; padding-left: 5px; }
+        .sub-section { margin-bottom: 15px; padding-left: 5px; }
         .sub-title { font-size: 0.9rem; color: #ffaa00; font-weight: bold; margin-bottom: 8px; }
         .form-group { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 0.85rem; }
         select, input[type="number"] { background-color: #2a2a2a; color: white; border: 1px solid #444; border-radius: 6px; padding: 6px; width: 120px; box-sizing: border-box; }
@@ -30,7 +31,7 @@
 
     <form id="configForm">
         <script>
-            // ボタン1〜5のHTML構造を動的に出力してスッキリさせます
+            // ボタン1〜5のHTML構造を動的に出力
             const swNames = ["SW1 (D3)", "SW2 (D4)", "SW3 (D5)", "SW4 (D9)", "SW5 (D10)"];
             const defaultVals = [
                 {n_m:1, n_on:21, n_off:22, n_l:0,  s_m:1, s_on:31, s_off:32, s_l:0}, // SW1
@@ -92,7 +93,7 @@
 </div>
 
 <script>
-    // マイコン側と完全に一致させるUUID
+    // マイコン側（実機完動版）と完全に同期しているUUID
     const MIDI_SERVICE_UUID = "03b80e5a-ede8-4b33-a751-6ce34ec4c700";
     const CONFIG_CHAR_UUID  = "7772e5db-3868-4112-a1a9-f2669d106bf4";
 
@@ -147,8 +148,13 @@
         data[idx++] = parseInt(document.getElementById("pots").value);
 
         try {
-            // BLE経由でXIAOへ42バイトを一斉書き込み
-            await configCharacteristic.writeValue(data);
+            // ⚡【改善点】iOS/Bluefyブラウザ環境下で最もパケットが安定する「応答なし書き込み」を明示的に呼び出し
+            if (typeof configCharacteristic.writeValueWithoutResponse === 'function') {
+                await configCharacteristic.writeValueWithoutResponse(data);
+            } else {
+                // フォールバック（通常のブラウザ用）
+                await configCharacteristic.writeValue(data);
+            }
             alert("設定を送信しました！コントローラーのLED点滅を確認してください。");
         } catch (error) {
             alert("送信失敗: " + error.message);
