@@ -25,19 +25,18 @@
 <div class="container">
     <h1>RH-BLE-MIDI Config</h1>
     
-    <button id="connectBtn" class="btn" onclick="connectBLE()">① コントローラーに接続</button>
-    <div id="statusText" class="status">状態: 未接続</div>
+    <button id="connectBtn" class="btn" onclick="connectBLE()">① 設定モードのコントローラーに接続</button>
+    <div id="statusText" class="status">状態: 未接続 (コントローラーを設定モードで起動してください)</div>
 
     <form id="configForm">
         <script>
-            // ボタン1〜5のHTML構造を動的に出力
             const swNames = ["SW1 (D3)", "SW2 (D4)", "SW3 (D5)", "SW4 (D9)", "SW5 (D10)"];
             const defaultVals = [
-                {n_m:1, n_on:21, n_off:22, n_l:0,  s_m:1, s_on:31, s_off:32, s_l:0}, // SW1
-                {n_m:1, n_on:23, n_off:24, n_l:0,  s_m:1, s_on:33, s_off:34, s_l:0}, // SW2
-                {n_m:0, n_on:25, n_off:0,  n_l:0,  s_m:0, s_on:35, s_off:0,  s_l:0}, // SW3
-                {n_m:0, n_on:26, n_off:0,  n_l:0,  s_m:0, s_on:36, s_off:0,  s_l:0}, // SW4
-                {n_m:2, n_on:27, n_off:0,  n_l:28, s_m:2, s_on:37, s_off:0,  s_l:38} // SW5
+                {n_m:1, n_on:21, n_off:22, n_l:0,  s_m:1, s_on:31, s_off:32, s_l:0}, 
+                {n_m:1, n_on:23, n_off:24, n_l:0,  s_m:1, s_on:33, s_off:34, s_l:0}, 
+                {n_m:0, n_on:25, n_off:0,  n_l:0,  s_m:0, s_on:35, s_off:0,  s_l:0}, 
+                {n_m:0, n_on:26, n_off:0,  n_l:0,  s_m:0, s_on:36, s_off:0,  s_l:0}, 
+                {n_m:2, n_on:27, n_off:0,  n_l:28, s_m:2, s_on:37, s_off:0,  s_l:38} 
             ];
 
             for(let i=0; i<5; i++) {
@@ -92,28 +91,27 @@
 </div>
 
 <script>
-    // マイコン側（実機完動版）と完全に同期しているUUID
-    const MIDI_SERVICE_UUID = "03b80e5a-ede8-4b33-a751-6ce34ec4c700";
-    const CONFIG_CHAR_UUID  = "7772e5db-3868-4112-a1a9-f2669d106bf4";
+    // 🎯 設定モード専用の「MIDIとは完全別系統」の独立UUID
+    const CONFIG_SERVICE_UUID = "e2000001-3868-4112-a1a9-f2669d106bf4";
+    const CONFIG_CHAR_UUID    = "e2000002-3868-4112-a1a9-f2669d106bf4";
 
     let bleDevice = null;
     let configCharacteristic = null;
 
     async function connectBLE() {
         try {
-            document.getElementById("statusText").innerText = "接続要求中...";
+            document.getElementById("statusText").innerText = "設定モードの電波をスキャン中...";
             
-            // ⚡【超重要修正】アドバタイズパケット制限をバイパスし、周囲の全デバイスをポップアップに強制表示
+            // 🎯 【確実】設定モードの親UUIDを持つデバイスのみをピンポイントで超高速捕捉
             bleDevice = await navigator.bluetooth.requestDevice({
-                acceptAllDevices: true,
-                optionalServices: [MIDI_SERVICE_UUID] // サービス接続に必要な親UUIDをここで許可
+                filters: [{ services: [CONFIG_SERVICE_UUID] }]
             });
 
             const server = await bleDevice.gatt.connect();
-            const service = await server.getPrimaryService(MIDI_SERVICE_UUID);
+            const service = await server.getPrimaryService(CONFIG_SERVICE_UUID);
             configCharacteristic = await service.getCharacteristic(CONFIG_CHAR_UUID);
 
-            document.getElementById("statusText").innerText = "状態: 接続完了！";
+            document.getElementById("statusText").innerText = "状態: 設定モード接続完了！";
             document.getElementById("statusText").style.color = "#00ffcc";
             document.getElementById("sendBtn").disabled = false;
             document.getElementById("connectBtn").innerText = "接続済み";
@@ -127,11 +125,9 @@
     async function sendConfig() {
         if (!configCharacteristic) return;
 
-        // 42バイトのデータバッファ配列を確保
         const data = new Uint8Array(42);
         let idx = 0;
 
-        // SW1〜SW5の入力値を順番にバイナリへパッキング
         for(let i=0; i<5; i++) {
             data[idx++] = parseInt(document.getElementById(`m${i}n`).value);
             data[idx++] = parseInt(document.getElementById(`on${i}n`).value);
@@ -144,18 +140,16 @@
             data[idx++] = parseInt(document.getElementById(`l${i}s`).value);
         }
 
-        // POT
         data[idx++] = parseInt(document.getElementById("potn").value);
         data[idx++] = parseInt(document.getElementById("pots").value);
 
         try {
-            // iOS/Bluefyブラウザ環境下で最もパケットが安定する「応答なし書き込み」を実行
             if (typeof configCharacteristic.writeValueWithoutResponse === 'function') {
                 await configCharacteristic.writeValueWithoutResponse(data);
             } else {
                 await configCharacteristic.writeValue(data);
             }
-            alert("設定を送信しました！コントローラーのLED点滅を確認してください。");
+            alert("設定をコントローラーに書き込みました！LEDの高速点滅を確認したら、コントローラーの電源を入れ直して通常モードで起動してください。");
         } catch (error) {
             alert("送信失敗: " + error.message);
         }
