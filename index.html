@@ -91,7 +91,6 @@
 </div>
 
 <script>
-    // 🎯 設定モード専用の「MIDIとは完全別系統」の独立UUID
     const CONFIG_SERVICE_UUID = "e2000001-3868-4112-a1a9-f2669d106bf4";
     const CONFIG_CHAR_UUID    = "e2000002-3868-4112-a1a9-f2669d106bf4";
 
@@ -102,7 +101,6 @@
         try {
             document.getElementById("statusText").innerText = "設定モードの電波をスキャン中...";
             
-            // 🎯 【確実】設定モードの親UUIDを持つデバイスのみをピンポイントで超高速捕捉
             bleDevice = await navigator.bluetooth.requestDevice({
                 filters: [{ services: [CONFIG_SERVICE_UUID] }]
             });
@@ -111,7 +109,33 @@
             const service = await server.getPrimaryService(CONFIG_SERVICE_UUID);
             configCharacteristic = await service.getCharacteristic(CONFIG_CHAR_UUID);
 
-            document.getElementById("statusText").innerText = "状態: 設定モード接続完了！";
+            document.getElementById("statusText").innerText = "設定データを読み込み中...";
+
+            // 🎯 【新実装：双方向同期】XIAO側のフラッシュメモリに現在ある42バイトの設定値を読み出す
+            const valueDataView = await configCharacteristic.readValue();
+            
+            // 読み出したバイナリデータを画面のUI要素へ逆展開（デシリアライズ）
+            if (valueDataView.byteLength === 42) {
+                let idx = 0;
+                for(let i=0; i<5; i++) {
+                    document.getElementById(`m${i}n`).value   = valueDataView.getUint8(idx++);
+                    document.getElementById(`on${i}n`).value  = valueDataView.getUint8(idx++);
+                    document.getElementById(`off${i}n`).value = valueDataView.getUint8(idx++);
+                    document.getElementById(`l${i}n`).value   = valueDataView.getUint8(idx++);
+
+                    document.getElementById(`m${i}s`).value   = valueDataView.getUint8(idx++);
+                    document.getElementById(`on${i}s`).value  = valueDataView.getUint8(idx++);
+                    document.getElementById(`off${i}s`).value = valueDataView.getUint8(idx++);
+                    document.getElementById(`l${i}s`).value   = valueDataView.getUint8(idx++);
+                }
+                document.getElementById("potn").value = valueDataView.getUint8(idx++);
+                document.getElementById("pots").value = valueDataView.getUint8(idx++);
+                
+                document.getElementById("statusText").innerText = "状態: 接続完了＆設定同期完了！";
+            } else {
+                document.getElementById("statusText").innerText = "状態: 接続完了 (データサイズ不一致)";
+            }
+
             document.getElementById("statusText").style.color = "#00ffcc";
             document.getElementById("sendBtn").disabled = false;
             document.getElementById("connectBtn").innerText = "接続済み";
